@@ -1,0 +1,15 @@
+{
+  "name": "shadow-ios-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "inspect": "node scripts/import-excel-history.js --inspect",
+    "import:dry": "node scripts/import-excel-history.js --dry-run",
+    "import": "node scripts/import-excel-history.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "xlsx": "^0.18.5"
+  }
+}
