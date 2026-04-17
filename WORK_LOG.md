@@ -126,3 +126,34 @@ Bitacora de trabajo sesion por sesion. Formato segun autonomous-work-protocol sk
 - Todos los workflows operacionales
 
 **Proximo paso**: Tarea 3 — git init + primer commit
+
+---
+
+#### Tarea 3 — Git init + push a GitHub
+
+**Estado**: completado
+
+**Pasos ejecutados**:
+- Pre-flight checks: 3/3 VACIOS (cero credenciales en archivos trackeables)
+- git init + branch main
+- git config user.email=rescignoaniello@gmail.com, user.name=Aniello Rescigno
+- git add -A (41 archivos, 4265 lineas)
+- git diff --cached: 0 JWTs reales encontrados
+- First commit: 1376a7a
+- Remote origin: https://github.com/rescignoaniello-crypto/shadow-ios.git
+- Push a main: exitoso
+- Fix URL commit: 43341ae (corregido username en README.md)
+- Post-validation: .env NO subido, mcp.json NO subido, SHADOW_IOS_MASTER NO subido
+
+**41 archivos trackeados**:
+- .claude/mcp.json.example, .env.example, .gitignore
+- CLAUDE.md, README.md, WORK_LOG.md
+- dashboard/ (14 archivos: src, config, package)
+- n8n/workflows/ (8 JSONs limpios)
+- scripts/ (2 archivos)
+- supabase/migrations/ (1 archivo)
+- package.json, package-lock.json
+
+**Resultado**: repo privado inicializado y sincronizado con GitHub
+
+**Proximo paso**: Tarea 4 — system_alerts + retry en W02
