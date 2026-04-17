@@ -125,7 +125,7 @@ Bitacora de trabajo sesion por sesion. Formato segun autonomous-work-protocol sk
 - 0 JWTs en el repo completo
 - Todos los workflows operacionales
 
-**Proximo paso**: Tarea 3 — git init + primer commit
+**Proximo paso**: Tarea 3
 
 ---
 
@@ -156,4 +156,44 @@ Bitacora de trabajo sesion por sesion. Formato segun autonomous-work-protocol sk
 
 **Resultado**: repo privado inicializado y sincronizado con GitHub
 
-**Proximo paso**: Tarea 4 — system_alerts + retry en W02
+**Proximo paso**: Tarea 4
+
+---
+
+#### Tarea 4 — system_alerts + retry W02 + migracion Evolution
+
+**Estado**: completado
+
+**Cambios Supabase**:
+- Migracion 002_system_alerts.sql ejecutada (manual por humano en SQL Editor)
+- Tabla system_alerts con 3 indices parciales y 1 comentario
+- Validada: insert + query + delete OK
+
+**Cambios W02 (retry + fallback)**:
+- Nodo "Notify admin": retryOnFail=true, maxTries=3, wait=5000ms
+- onError: continueRegularOutput (no bloquea el workflow)
+- Nuevo nodo IF "Notify failed?" -> detecta $json.error
+- Nuevo nodo HTTP "Log system alert" -> inserta en system_alerts (rama true)
+- Nuevo nodo NoOp "Notify OK" -> rama exitosa (false)
+- Total nodos W02: 7 -> 10
+
+**Migracion Evolution API**:
+- 7 nodos tenian key 3FDA...D424E hardcoded en 3 workflows
+- W02: 1 nodo (Notify admin)
+- W04: 1 nodo (Send WhatsApp admin)
+- W06: 5 nodos (A: Send template, A: Confirm, B: Notify, C: Confirm, D: Confirm)
+- Todos migrados a credencial "Evolution account" (id vabu5FHInLG8vGmD)
+- 0 API keys Evolution hardcoded en repo
+
+**Test controlado**:
+- Tabla system_alerts: insert/query/delete validados via REST API
+- Test E2E completo del retry: pendiente ejecucion manual (API n8n no soporta mock payload para manualTrigger)
+- El patron retry+fallback esta configurado y activo
+
+**Validacion final**:
+- grep JWTs repo: VACIO
+- grep Evolution key repo: VACIO
+- W02 active=true, W04 active=true, W06 active=true
+- W05 webhook rate: OK (Bs=635)
+
+**Proximo paso**: Sprint 1 — comandos faltantes
