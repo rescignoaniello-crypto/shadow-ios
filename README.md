@@ -32,7 +32,7 @@ Primera implementacion: Primal VZla (tienda de ropa, Venezuela).
 
 ```bash
 # 1. Clonar
-git clone https://github.com/rescignoaniello/shadow-ios.git
+git clone https://github.com/rescignoaniello-crypto/shadow-ios.git
 cd shadow-ios
 
 # 2. Configurar credenciales
