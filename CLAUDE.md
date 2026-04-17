@@ -119,7 +119,7 @@ CREATE TABLE orders (
   channel TEXT CHECK (channel IN ('whatsapp','shopify','instagram','manual')),
   status TEXT DEFAULT 'pendiente_pago' CHECK (status IN (
     'pendiente_pago','confirmado','en_preparacion',
-    'en_ruta','entregado','completado','cancelado'
+    'en_ruta','despachado','entregado','completado','cancelado'
   )),
   delivery_type TEXT CHECK (delivery_type IN ('delivery','envio','pickup')),
   carrier TEXT,
@@ -334,10 +334,77 @@ Ejecutar en este orden exacto:
 
 - **Automatizaciones:** n8n (self-hosted en Contabo via Easypanel)
 - **Base de datos:** Supabase (PostgreSQL)
-- **WhatsApp:** Evolution API
+- **WhatsApp:** Evolution API (instancia "prueba", webhookBase64=true)
 - **E-commerce:** Shopify (OAuth2)
-- **IA del agente:** Claude API (claude-haiku-4-5 para tareas rapidas, claude-sonnet-4-6 para razonamiento)
+- **Vision/OCR:** GPT-4o-mini via OpenAI API (temporal — migrar a Claude Haiku cuando se tenga API key)
 - **Dashboard (Modulo 2, proxima fase):** Next.js + Tailwind + Vercel
+
+---
+
+## WORKFLOWS N8N — ESTADO ACTUAL
+
+| ID | Workflow | Funcion | Estado |
+|----|----------|---------|--------|
+| 3sj3qGPw5oECiLDB | 01 Tasa de cambio diaria | Cron 8am: Binance P2P → exchange_rates | Inactivo |
+| GUanijFyA7biDyRX | 02 Shopify nuevo pedido | Order Created → orders + notif WhatsApp | Activo |
+| qvySBgmDdvTHatVO | 03 Kira nueva venta | Webhook venta Kira → orders + cash | Activo |
+| v67cGduUEFLwFnbq | 04 Resumen diario | Cron 10pm → resumen caja al admin | Activo |
+| 9w3OqxiB8pZcOfvp | 05 Rate webhook | GET /webhook/rate → {Bs, Dolar} | Activo |
+| X16QoSlg2WyXocbj | 06 Dashboard listener | 8 comandos WhatsApp (41 nodos) | Activo |
+| ha7xPM5H4nMKHQSl | 07 Evolution fanout | Rutea mensajes: grupos→Shadow, privados→Kira+Zelle (15 nodos) | Activo |
+| 4FYpMkhhMkXw1PEo | 08 Shopify order updated | Order Updated → sync status | Activo |
+
+---
+
+## COMANDOS W06 — DASHBOARD LISTENER
+
+W06 recibe mensajes via webhook de W07 (fanout). El nodo Route intent
+clasifica por grupo de origen y patron de texto.
+
+### Comandos desde grupo Dashboard
+
+| Comando | Formato | Accion | Respuesta |
+|---------|---------|--------|-----------|
+| delivery | `delivery #XXXX Nombre TEL destino DIR cobrar $XX` | Insert deliveries + plantilla PyP | "Delivery #XXXX registrado. Plantilla enviada a PyP." |
+| pagado | `pagado #XXXX zelle $45` o `pagado #XXXX mixto cash $20 zelle $25` | Update order + insert cash_movements | "Pago #XXXX registrado. Pedido confirmado." |
+| saldo | `saldo` | Query cash_movements + rate | Saldos 4 wallets + total USD |
+| envio | `envio #XXXX mrw TRACKING` | Update order (carrier, tracking, status=despachado) + WhatsApp al cliente | "Despachado por MRW. Tracking enviado a Nombre (Ciudad)." |
+| gasto | `gasto $25 gasolina` o `gasto $100 zelle mercaderia` | Insert cash_movements (egreso) | "Gasto $25 registrado. Caja -$25 cash." |
+| cambio | `cambio $200 cash zelle` | 2x insert cash_movements (egreso + ingreso) | "Cambio registrado: $200 cash → zelle." |
+
+### Comandos desde grupo PyP
+
+| Comando | Formato | Accion | Respuesta (en Dashboard) |
+|---------|---------|--------|--------------------------|
+| recibido | `recibido $45 bryant` | Update delivery cobrado + insert cash (ingreso cash_usd) | "Recibido $45 de bryant. Delivery cerrado. Caja +$45 cash." |
+| rider | `Bryant` (nombre solo) | Update delivery mas reciente pendiente → asignado | "Delivery #XXXX asignado a bryant." |
+
+---
+
+## ARQUITECTURA FANOUT (W07)
+
+W07 es el punto de entrada de TODOS los mensajes de WhatsApp.
+Evolution API envia todos los mensajes a un solo webhook.
+W07 clasifica y rutea:
+
+```
+Evolution webhook → Classify (isGroup, isImage, fromMe)
+  ├─ Grupo (@g.us)
+  │   └─ Shadow iOS W06 (webhook shadow-ios-wa-listener)
+  └─ Privado (@s.whatsapp.net)
+      └─ Is image?
+          ├─ SI → Z: cadena Zelle (inline, 8 nodos) + Kira (paralelo)
+          └─ NO → Kira + Shadow iOS
+```
+
+**Regla critica:** Kira SOLO recibe mensajes privados (@s.whatsapp.net).
+Nunca recibe mensajes de grupos. El fanout garantiza esto.
+
+**Zelle reader (nodos Z:):** Cuando un cliente envia una imagen en chat
+privado, W07 la procesa con GPT-4o-mini Vision para detectar comprobantes
+Zelle automaticamente. Si es Zelle: registra pago y confirma en Dashboard.
+Si no es Zelle: para silenciosamente (NOT_ZELLE). Kira recibe el mensaje
+en paralelo sin interferencia.
 
 ---
 
@@ -346,24 +413,30 @@ Ejecutar en este orden exacto:
 ```
 shadow-ios/
 ├── CLAUDE.md                    <- este archivo
+├── ESTADO_ACTUAL.md             <- estado completo del proyecto (leer primero)
 ├── .claude/
 │   └── mcp.json                 <- configuracion MCPs
 ├── .env                         <- variables de entorno (NO en git)
 ├── .env.example                 <- plantilla de credenciales (SI en git)
 ├── supabase/
 │   └── migrations/
-│       └── 001_initial_schema.sql
+│       ├── 001_initial_schema.sql
+│       └── 002_add_despachado_status.sql
 ├── n8n/
 │   └── workflows/               <- JSONs de los flujos exportados
+│       ├── 06-dashboard-listener.json
+│       └── 07-evolution-fanout.json
 ├── scripts/
-│   ├── import-excel-history.js
-│   └── test-all.js
+│   └── import-excel-history.js
 └── dashboard/                   <- Modulo 2 (Next.js app)
 ```
 
 ---
 
-## MODULO 3 — FLUJOS DE DELIVERY Y CAJA POR WHATSAPP
+## MODULO 3 — FLUJOS DE DELIVERY Y CAJA POR WHATSAPP (COMPLETADO)
+
+> **Estado:** Todos los comandos de este modulo estan implementados y activos en W06.
+> Ver seccion COMANDOS W06 arriba para la referencia rapida de cada comando.
 
 ### Contexto operacional
 
@@ -430,23 +503,27 @@ delivery #XXXX NombreCliente TELEFONO destino DIRECCION pagado
 3. Notificar en Dashboard: "Delivery #XXXX asignado a {{rider}}. En camino."
 
 **Lista de motorizados conocidos:**
-bryant, robert, hector, omar, wilmer, luis, anderson, caldera, ostos, vargas, fabian, diego, johan, kevin, kelvin, abraham, oguir, leonel, ronald, jaider, riyeson, gustavo, marcos, daniela
+bryant, robert, hector, omar, wilmer, luis, anderson, caldera, ostos, vargas, fabian, diego, johan, kevin, kelvin, abraham, oguir, leonel, ronald, jaider, riyeson, gustavo, marcos, daniela, larry, miguel, farfan, jhosty, valera
 
 ### Flujo C — Confirmar cash recibido
 
-**Trigger:** Mensaje de Aniello en grupo Dashboard con patron:
+**Trigger:** Mensaje de Aniello en grupo **PyP** (NO Dashboard) con patron:
 ```
 recibido $XX nombreMotorizado
 recibido $XX
 cobrado #XXXX $XX
 ```
 
+> **IMPORTANTE:** Aniello escribe "recibido" en el grupo PyP (donde esta la conversacion
+> con las chicas de la agencia). Shadow detecta el comando desde PyP pero la confirmacion
+> siempre va al grupo Dashboard. Shadow NUNCA responde en PyP.
+
 **Logica:**
 1. Parsear monto y nombre del motorizado
 2. Buscar delivery en status='asignado' o 'en_ruta' con ese rider
 3. Actualizar delivery: status='cobrado', cash_collected=true, cash_collected_amount=monto
 4. Insertar en cash_movements: wallet='cash_usd', movement_type='ingreso', amount=monto, concept='Delivery cobrado - {{rider}}'
-5. Confirmar en Dashboard: "Recibido $XX de {{rider}}. Delivery #XXXX cerrado. Caja actualizada."
+5. Confirmar en **Dashboard** (no PyP): "Recibido $XX de {{rider}}. Delivery #XXXX cerrado. Caja actualizada."
 
 ### Flujo D — Registrar pago de cliente (pagos recibidos)
 
