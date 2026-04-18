@@ -53,4 +53,34 @@
 - Dashboard: "✅ Binance $150 — Luis Malavé #2062 — registrado."
 - **2/2 PASS**
 
+### TAREA 4 — Comando pagopyp ✅
+**Completada:** ~00:30 UTC
+- Nodos I: en W06 (3 nodos: Parse → Insert cash → Confirm)
+- Format: `pagopyp $XX [zelle|bs]` (default: zelle)
+- Egreso en wallet correspondiente, concept='Pago a PyP'
+- W06 ahora tiene 44 nodos y 9 comandos
+- **3/3 PASS** (default zelle, explicit bs, explicit zelle)
+
+### TAREA 5 — Alertas proactivas ✅
+**Completada:** ~00:45 UTC
+- W01 reconstruido desde cero (solo tenia trigger)
+- 8 nodos: Cron → Binance P2P → Average → Upsert rate → Stale orders → Balances → Build msg → Send
+- Morning briefing a las 8am VET con: tasa + saldos + pedidos estancados
+- Error handling: si Binance falla, usa ultima tasa conocida
+- **ACTIVADO** — primera ejecucion real mañana 8am VET
+- W04 (resumen diario 10pm) no tocado — ya funciona en produccion
+
+### TAREA 6 — Tracking automatico ✅
+**Completada:** ~01:00 UTC
+- C: GPT Vision prompt ampliado: detecta `doc_type: payment | shipping | unknown`
+- C: Parse receipt bifurca: payment → cadena pago, shipping → cadena tracking
+- Cadena tracking: Track find order → Track update → Track notify → Track confirm
+- W07 ahora tiene 38 nodos
+- **2/2 PASS** (guia MRW con contexto #2061 → despachado + tracking enviado)
+
+### TAREA 7 — Documentacion ✅
+**Completada:** ~01:10 UTC
+- ESTADO_ACTUAL.md reescrito con 4 sprints completados
+- PROGRESO_NOCHE.md actualizado con todas las tareas
+
 ---
